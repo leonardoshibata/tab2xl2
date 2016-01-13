@@ -1,4 +1,4 @@
-*! version 0.0.1 12jan2015
+*! version 0.0.1 12jan2016
 * based on tab2xl http://blog.stata.com/2013/09/25/export-tables-to-excel/
 program tab2xl2
 	version 13.1

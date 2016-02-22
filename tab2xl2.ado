@@ -62,7 +62,7 @@ program tab2xl2
 		local val = varRowNames[`i',1]
 		local val_lab : label (`varRow') `val'
 
-		quietly putexcel A`row'=("`val_lab'")
+		quietly putexcel `columnLetter'`row'=("`val_lab'")
 		sleep 10
 		
 		if "`colf'" != "" | "`rowf'" != "" local row = `row' + 2

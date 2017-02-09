@@ -8,7 +8,8 @@
 
 program tab2xl2
 	version 13.1
-	syntax varlist(min=2 max=2) using/, row(integer) col(integer) [replace modify colf rowf]
+	syntax varlist(min=2 max=2) using/, row(integer) col(integer) [replace modify colf rowf withouthead missing]
+
 
 	* Use the arguments to define the variables to be used in tabulation 
 	local varRow `1' /* points to the variable to be displayed in the row */
@@ -16,7 +17,7 @@ program tab2xl2
 	local rowStart = `row' /* row number where to start plotting the data */
 	local colStart = `col' /* column number where to start plotting the data */
 
-	quietly tabulate `varRow' `varCol', matcell(freq) matrow(varRowNames) matcol(varColNames) /* this is the command that tab2xl2 is using "under the hood" to tabulate */
+	quietly tabulate `varRow' `varCol', matcell(freq) matrow(varRowNames) matcol(varColNames) `missing' /* this is the command that tab2xl2 is using "under the hood" to tabulate */
 
 	local observationsNum = r(N) /* saves total number of observations */
 
@@ -39,7 +40,6 @@ program tab2xl2
 	quietly putexcel set `"`using'"', `replace' `modify' keepcellformat
 
 
-
 	* Start plotting the table. First row with variable labels or names
 	local column1 = `colStart'
 	num2base26 `column1'
@@ -48,27 +48,48 @@ program tab2xl2
 	num2base26 `column2'
 	local columnLetter2 "`r(col_letter)'"
 
-	quietly putexcel `columnLetter1'`rowStart'=("`varRowLabel'") `columnLetter2'`rowStart'=("`varColLabel'")
 
+	if "`withouthead'"=="withouthead" quietly putexcel `columnLetter1'`rowStart'=("`varRowLabel'")
+
+	else quietly putexcel `columnLetter1'`rowStart'=("`varRowLabel'") `columnLetter2'`rowStart'=("`varColLabel'")
 
 
 	* Second row: display columns VALUES LABELS. If rowf or colf options selected, third row will display "N" and "%" headers.
-	local columns = colsof(varColNames)
-	local column = `colStart' + 1
-	local row = `rowStart' + 1
+	if "`withouthead'"=="" {
 
-	if "`rowf'"=="rowf" | "`colf'"=="colf" local steps = 2 /* if user chooses one of the mentioned options, jump two columns to the right instead of one when plotting variable labels. This is because next row will have "N"s and "%"s. */
-	else local steps = 1 
+		local columns = colsof(varColNames)
+		local column = `colStart' + 1
+		local row = `rowStart' + 1
 
-	forvalues i = 1 / `columns' {
+		if "`rowf'"=="rowf" | "`colf'"=="colf" local steps = 2 /* if user chooses one of the mentioned options, jump two columns to the right instead of one when plotting variable labels. This is because next row will have "N"s and "%"s. */
+		else local steps = 1 
 
-		local val = varColNames[1,`i']
-		local val_lab : label (`varCol') `val'
+		forvalues i = 1 / `columns' {
+
+			local val = varColNames[1,`i']
+			local val_lab : label (`varCol') `val'
+			num2base26 `column'
+			local columnLetter "`r(col_letter)'"
+			quietly putexcel `columnLetter'`row'=("`val_lab'")
+			sleep 10
+
+			if "`rowf'"=="rowf" | "`colf'"=="colf" { /* plot the "N"s and "%"s */
+				local row = `row' + 1
+				local percentCol = `column'+1
+				num2base26 `percentCol'
+				local percentColLetter "`r(col_letter)'"
+
+				quietly putexcel `columnLetter'`row'=("N") `percentColLetter'`row'=("%")
+				local row = `row' - 1
+			}
+
+			local column = `column' + `steps'
+		}
+
 		num2base26 `column'
 		local columnLetter "`r(col_letter)'"
-		quietly putexcel `columnLetter'`row'=("`val_lab'")
+		quietly putexcel `columnLetter'`row'=("Total") /* Last column contains text "Total" */
 		sleep 10
-
 		if "`rowf'"=="rowf" | "`colf'"=="colf" { /* plot the "N"s and "%"s */
 			local row = `row' + 1
 			local percentCol = `column'+1
@@ -76,29 +97,11 @@ program tab2xl2
 			local percentColLetter "`r(col_letter)'"
 
 			quietly putexcel `columnLetter'`row'=("N") `percentColLetter'`row'=("%")
-			local row = `row' - 1
 		}
-
-		local column = `column' + `steps'
-	}
-
-	num2base26 `column'
-	local columnLetter "`r(col_letter)'"
-	quietly putexcel `columnLetter'`row'=("Total") /* Last column contains text "Total" */
-	sleep 10
-	if "`rowf'"=="rowf" | "`colf'"=="colf" { /* plot the "N"s and "%"s */
-		local row = `row' + 1
-		local percentCol = `column'+1
-		num2base26 `percentCol'
-		local percentColLetter "`r(col_letter)'"
-
-		quietly putexcel `columnLetter'`row'=("N") `percentColLetter'`row'=("%")
 	}
 
 
-
-
-	* Third row: display rows VALUES LABELS. If rowf or colf options selected, fourth row instead.
+	* Third row: display rows VALUES LABELS. If rowf or colf options selected, fourth row instead. If withouthead, subtract one or two rows.
 	local column = `colStart'
 	num2base26 `column'
 	local columnLetter "`r(col_letter)'"	
@@ -106,6 +109,9 @@ program tab2xl2
 
 	if "`rowf'"=="rowf" | "`colf'"=="colf" local row = `rowStart' + 3
 	else local row = `rowStart' + 2
+
+	if "`withouthead'"=="withouthead" local row = `row' - 1
+	if "`withouthead'"=="withouthead" & ("`rowf'"=="rowf" | "`colf'"=="colf") local row = `row' - 1
 
 	forvalues i = 1/`rows' {
 		local val = varRowNames[`i',1]
@@ -116,7 +122,6 @@ program tab2xl2
 		
 		local row = `row' + 1
 	}
-
 
 
 
@@ -133,8 +138,13 @@ program tab2xl2
 	* Fill in frequencies and rows totals. If colf or rowf options, also fill in percentages.
 	if "`rowf'"=="rowf" | "`colf'"=="colf" local row = `rowStart' + 3
 	else local row = `rowStart' + 2
+
+	if "`withouthead'"=="withouthead" local row = `row' - 1
+	if "`withouthead'"=="withouthead" & ("`rowf'"=="rowf" | "`colf'"=="colf") local row = `row' - 1	
+
 	local rows = rowsof(freq)
 	local cols = colsof(freq)
+
 
 	forvalues i = 1/`rows' {
 
@@ -149,9 +159,10 @@ program tab2xl2
 			local percentColLetter "`r(col_letter)'"
 
 			local freq_val = freq[`i',`j']
+
 			if "`colf'" == "colf" local percent_val = `freq_val'/columnsTotals[1,`j']*100
 			else if "`rowf'" == "rowf" local percent_val = `freq_val'/rowsTotals[`i',1]*100
-			local percent_val : display %9.1f `percent_val'
+			local percent_val : display %9.1fc `percent_val'
 
 			if "`colf'" == "colf" | "`rowf'" == "rowf" {
 				quietly putexcel `columnLetter'`row'=(`freq_val') `percentColLetter'`row'=(`percent_val')
@@ -163,7 +174,6 @@ program tab2xl2
 				sleep 10
 				local column = `column' + 1	
 			}
-
 		}
 
 
@@ -174,8 +184,8 @@ program tab2xl2
 		num2base26 `percentCol'
 		local percentColLetter "`r(col_letter)'"
 		if "`colf'" == "colf" local percentTotal = rowsTotals[`i',1]/`observationsNum'*100 /* todo: algo errado */
-		else if "`rowf'" == "rowf" local percentTotal = 100.0
-		local percentTotal : display %9.1f `percentTotal'
+		else if "`rowf'" == "rowf" local percentTotal = 100
+		local percentTotal : display %9.1fc `percentTotal'
 
 
 		if "`colf'" == "colf" | "`rowf'" == "rowf" {
@@ -213,8 +223,8 @@ program tab2xl2
 		num2base26 `percentCol'
 		local percentColLetter "`r(col_letter)'"
 		if "`rowf'"=="rowf" local percentTotal = columnsTotals[1,`i']/`observationsNum'*100 /*todo: algo de errado aqui*/
-		else if "`colf'"=="colf" local percentTotal = 100.0
-		local percentTotal : display %9.1f `percentTotal'
+		else if "`colf'"=="colf" local percentTotal = 100
+		local percentTotal : display %9.1fc `percentTotal'
 
 		if "`rowf'"=="rowf" | "`colf'"=="colf" {
 			quietly putexcel `columnLetter'`row'=(columnsTotals[1,`i']) `percentColLetter'`row'=(`percentTotal')
@@ -243,6 +253,7 @@ program tab2xl2
 		quietly putexcel `columnLetter'`row'=(`observationsNum')
 		sleep 10
 	}
+
 
 end
 

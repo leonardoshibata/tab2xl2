@@ -1,6 +1,9 @@
 # tab2xl2
 Stata program similar to tab2xl but for two-way tabulations. Allows column and row relative frequencies.
 
+**this code is no longer maintained**
+
+
 ## Change log:
 * **version 0.0.2 (02mar2016)** - major rewrite in this version. Since the aim is to write tab2xl2 so it generates excel files almost ready for publishing, I decided to changed the table presentation. Now column or row percentages are shown side by side of frequencies, as opposed to under it. Also corrected a bug pointed by Bryan.
 
